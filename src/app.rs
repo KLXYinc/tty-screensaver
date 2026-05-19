@@ -1,16 +1,3 @@
-use crossterm::{
-    cursor::MoveTo,
-    event::{
-        DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, poll,
-        read,
-    },
-    execute, queue,
-    style::{Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-    terminal::{Clear, ClearType},
-};
-use std::io::{Stdout, Write};
-use std::time::{Duration, Instant};
-
 use crate::buffer::ScreenBuffer;
 use crate::charsets::{CharSet, get_all_charsets_utf8};
 use crate::config::AppConfig;
@@ -48,7 +35,18 @@ use crate::visualizer::stripes::StripesVisualizer;
 use crate::visualizer::synthwave::SynthwaveVisualizer;
 use crate::visualizer::tetris::TetrisVisualizer;
 use crate::visualizer::waves::WavesVisualizer;
-
+use crossterm::{
+    cursor::MoveTo,
+    event::{
+        DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, poll,
+        read,
+    },
+    execute, queue,
+    style::{Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+    terminal::{Clear, ClearType},
+};
+use std::io::{Stdout, Write};
+use std::time::{Duration, Instant};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Mode {
     Matrix,
@@ -83,7 +81,6 @@ pub enum Mode {
     Name,
     Bonsai,
 }
-
 impl Mode {
     pub fn name(&self) -> &'static str {
         match self {
@@ -121,7 +118,6 @@ impl Mode {
         }
     }
 }
-
 pub const MODES: [Mode; 31] = [
     Mode::Matrix,
     Mode::Fire,
@@ -155,7 +151,6 @@ pub const MODES: [Mode; 31] = [
     Mode::Name,
     Mode::Bonsai,
 ];
-
 pub struct App {
     mode_idx: usize,
     config: AppConfig,
@@ -169,13 +164,11 @@ pub struct App {
     target_frame_duration: Duration,
     hud_timer: f64,
 }
-
 impl App {
     pub fn new(fps: u32, width: u16, height: u16) -> Self {
         let themes = get_all_themes();
         let charsets = get_all_charsets_utf8();
         let config = AppConfig::load();
-
         let mut mode_idx = 0;
         if !config.last_mode.is_empty() {
             for (i, mode) in MODES.iter().enumerate() {
@@ -185,21 +178,18 @@ impl App {
                 }
             }
         }
-
         let mode = MODES[mode_idx];
         let mode_conf = config.get_mode_config(mode.name());
-
         let theme_idx = mode_conf.theme_idx.min(themes.len() - 1);
         let charset_idx = mode_conf.charset_idx.min(charsets.len() - 1);
-
         let visualizer = Self::create_visualizer(
             mode,
             width,
             height,
             themes[theme_idx].palette.clone(),
             charsets[charset_idx].clone(),
+            config.utc_offset_hours,
         );
-
         Self {
             mode_idx,
             config,
@@ -214,13 +204,13 @@ impl App {
             hud_timer: 3.0,
         }
     }
-
     fn create_visualizer(
         mode: Mode,
         width: u16,
         height: u16,
         palette: ThemePalette,
         charset: CharSet,
+        utc_offset_hours: i32,
     ) -> Box<dyn Visualizer> {
         match mode {
             Mode::Matrix => Box::new(MatrixVisualizer::new(width, height, palette, charset)),
@@ -250,19 +240,22 @@ impl App {
             Mode::Lorenz => Box::new(LorenzVisualizer::new(width, height, palette, charset)),
             Mode::Hex3D => Box::new(Hex3DVisualizer::new(width, height, palette, charset)),
             Mode::Minecraft => Box::new(MinecraftVisualizer::new(width, height, palette, charset)),
-            Mode::Clocks => Box::new(ClocksVisualizer::new(width, height, palette, charset)),
+            Mode::Clocks => Box::new(ClocksVisualizer::new(
+                width,
+                height,
+                palette,
+                charset,
+                utc_offset_hours,
+            )),
             Mode::Aquarium => Box::new(AquariumVisualizer::new(width, height, palette, charset)),
             Mode::Name => Box::new(NameVisualizer::new(width, height, palette, charset)),
             Mode::Bonsai => Box::new(BonsaiVisualizer::new(width, height, palette, charset)),
         }
     }
-
     pub fn run(&mut self, stdout: &mut Stdout) -> Result<(), Box<dyn std::error::Error>> {
         execute!(stdout, EnableMouseCapture)?;
         execute!(stdout, ResetColor, Clear(ClearType::All))?;
-
         let mut last_frame_time = Instant::now();
-
         'main_loop: loop {
             while poll(Duration::from_millis(0))? {
                 let event = read()?;
@@ -271,49 +264,52 @@ impl App {
                         if key_event.kind != KeyEventKind::Press {
                             continue;
                         }
-
                         let mut changed_theme = false;
                         let mut changed_mode = false;
                         let mut changed_charset = false;
-
+                        let consumed = self.visualizer.on_key(key_event.code, key_event.modifiers);
                         let mode_name = MODES[self.mode_idx].name();
                         let mut mode_conf = self.config.get_mode_config(mode_name);
-
-                        match key_event.code {
-                            KeyCode::Char('q') | KeyCode::Esc => break 'main_loop,
-                            KeyCode::Up if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                                mode_conf.charset_idx =
-                                    (mode_conf.charset_idx + 1) % self.charsets.len();
-                                changed_charset = true;
+                        if !consumed {
+                            match key_event.code {
+                                KeyCode::Char('q') | KeyCode::Esc => break 'main_loop,
+                                KeyCode::Up
+                                    if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
+                                {
+                                    mode_conf.charset_idx =
+                                        (mode_conf.charset_idx + 1) % self.charsets.len();
+                                    changed_charset = true;
+                                }
+                                KeyCode::Down
+                                    if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
+                                {
+                                    mode_conf.charset_idx =
+                                        (mode_conf.charset_idx + self.charsets.len() - 1)
+                                            % self.charsets.len();
+                                    changed_charset = true;
+                                }
+                                KeyCode::Right => {
+                                    self.mode_idx = (self.mode_idx + 1) % MODES.len();
+                                    changed_mode = true;
+                                }
+                                KeyCode::Left => {
+                                    self.mode_idx = (self.mode_idx + MODES.len() - 1) % MODES.len();
+                                    changed_mode = true;
+                                }
+                                KeyCode::Up => {
+                                    mode_conf.theme_idx =
+                                        (mode_conf.theme_idx + 1) % self.themes.len();
+                                    changed_theme = true;
+                                }
+                                KeyCode::Down => {
+                                    mode_conf.theme_idx = (mode_conf.theme_idx + self.themes.len()
+                                        - 1)
+                                        % self.themes.len();
+                                    changed_theme = true;
+                                }
+                                _ => {}
                             }
-                            KeyCode::Down
-                                if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
-                            {
-                                mode_conf.charset_idx =
-                                    (mode_conf.charset_idx + self.charsets.len() - 1)
-                                        % self.charsets.len();
-                                changed_charset = true;
-                            }
-                            KeyCode::Right => {
-                                self.mode_idx = (self.mode_idx + 1) % MODES.len();
-                                changed_mode = true;
-                            }
-                            KeyCode::Left => {
-                                self.mode_idx = (self.mode_idx + MODES.len() - 1) % MODES.len();
-                                changed_mode = true;
-                            }
-                            KeyCode::Up => {
-                                mode_conf.theme_idx = (mode_conf.theme_idx + 1) % self.themes.len();
-                                changed_theme = true;
-                            }
-                            KeyCode::Down => {
-                                mode_conf.theme_idx = (mode_conf.theme_idx + self.themes.len() - 1)
-                                    % self.themes.len();
-                                changed_theme = true;
-                            }
-                            _ => {}
                         }
-
                         if changed_theme || changed_charset {
                             self.config.set_mode_config(
                                 mode_name,
@@ -321,29 +317,25 @@ impl App {
                                 mode_conf.charset_idx,
                             );
                         }
-
                         if changed_mode || changed_theme || changed_charset {
                             self.hud_timer = 3.0;
                         }
-
                         if changed_mode {
                             execute!(stdout, ResetColor, Clear(ClearType::All))?;
                             self.prev_buffer.clear();
-
                             let new_mode = MODES[self.mode_idx];
                             self.config.last_mode = new_mode.name().to_string();
                             self.config.save();
-
                             let new_conf = self.config.get_mode_config(new_mode.name());
                             let theme_idx = new_conf.theme_idx.min(self.themes.len() - 1);
                             let charset_idx = new_conf.charset_idx.min(self.charsets.len() - 1);
-
                             self.visualizer = Self::create_visualizer(
                                 new_mode,
                                 self.width,
                                 self.height,
                                 self.themes[theme_idx].palette.clone(),
                                 self.charsets[charset_idx].clone(),
+                                self.config.utc_offset_hours,
                             );
                         } else {
                             if changed_theme {
@@ -362,7 +354,6 @@ impl App {
                             crossterm::event::MouseEventKind::ScrollDown => -1,
                             _ => 0,
                         };
-
                         if delta != 0 {
                             let is_ctrl = mouse_event.modifiers.contains(KeyModifiers::CONTROL);
                             self.visualizer.on_scroll_ext(delta, is_ctrl);
@@ -380,25 +371,19 @@ impl App {
                     _ => {}
                 }
             }
-
             let now = Instant::now();
             let delta_time = now.duration_since(last_frame_time).as_secs_f64();
             last_frame_time = now;
-
             self.visualizer.update(delta_time);
-
             if self.hud_timer > 0.0 {
                 self.hud_timer -= delta_time;
             }
-
             self.visualizer.draw(&mut self.current_buffer);
-
             if self.hud_timer > 0.0 {
                 let mode_name = MODES[self.mode_idx].name();
                 let conf = self.config.get_mode_config(mode_name);
                 let t_idx = conf.theme_idx.min(self.themes.len() - 1);
                 let c_idx = conf.charset_idx.min(self.charsets.len() - 1);
-
                 draw_hud(
                     &mut self.current_buffer,
                     MODES[self.mode_idx],
@@ -406,38 +391,30 @@ impl App {
                     &self.charsets[c_idx],
                 );
             }
-
             self.render_diff(stdout)?;
-
             let elapsed = now.elapsed();
             if elapsed < self.target_frame_duration {
                 std::thread::sleep(self.target_frame_duration - elapsed);
             }
         }
-
         execute!(stdout, DisableMouseCapture)?;
-
         Ok(())
     }
-
     fn render_diff(&mut self, stdout: &mut Stdout) -> std::io::Result<()> {
         let mut last_fg = None;
         let mut last_bg = None;
         let mut last_y = u16::MAX;
         let mut last_x = u16::MAX;
-
         for y in 0..self.height {
             for x in 0..self.width {
                 let current_cell = self.current_buffer.get(x, y).unwrap();
                 let prev_cell = self.prev_buffer.get(x, y).unwrap();
-
                 if current_cell != prev_cell {
                     if y != last_y || x != last_x + 1 {
                         queue!(stdout, MoveTo(x, y))?;
                     }
                     last_x = x;
                     last_y = y;
-
                     if Some(current_cell.fg) != last_fg {
                         queue!(stdout, SetForegroundColor(current_cell.fg))?;
                         last_fg = Some(current_cell.fg);
@@ -446,12 +423,10 @@ impl App {
                         queue!(stdout, SetBackgroundColor(current_cell.bg))?;
                         last_bg = Some(current_cell.bg);
                     }
-
                     queue!(stdout, Print(current_cell.c))?;
                 }
             }
         }
-
         stdout.flush()?;
         std::mem::swap(&mut self.current_buffer, &mut self.prev_buffer);
         Ok(())

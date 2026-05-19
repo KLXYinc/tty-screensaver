@@ -1,12 +1,10 @@
 use crossterm::style::Color;
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Cell {
     pub c: char,
     pub fg: Color,
     pub bg: Color,
 }
-
 impl Default for Cell {
     fn default() -> Self {
         Self {
@@ -16,13 +14,11 @@ impl Default for Cell {
         }
     }
 }
-
 pub struct ScreenBuffer {
     pub width: u16,
     pub height: u16,
     pub cells: Vec<Cell>,
 }
-
 impl ScreenBuffer {
     pub fn new(width: u16, height: u16) -> Self {
         Self {
@@ -31,7 +27,6 @@ impl ScreenBuffer {
             cells: vec![Cell::default(); (width as usize) * (height as usize)],
         }
     }
-
     pub fn resize(&mut self, width: u16, height: u16) {
         if self.width != width || self.height != height {
             self.width = width;
@@ -39,18 +34,15 @@ impl ScreenBuffer {
             self.cells = vec![Cell::default(); (width as usize) * (height as usize)];
         }
     }
-
     pub fn clear(&mut self) {
         self.cells.fill(Cell::default());
     }
-
     pub fn set(&mut self, x: u16, y: u16, c: char, fg: Color, bg: Color) {
         if x < self.width && y < self.height {
             let idx = (y as usize) * (self.width as usize) + (x as usize);
             self.cells[idx] = Cell { c, fg, bg };
         }
     }
-
     pub fn set_str(&mut self, x: u16, y: u16, text: &str, fg: Color, bg: Color) {
         let mut curr_x = x;
         for c in text.chars() {
@@ -61,7 +53,32 @@ impl ScreenBuffer {
             curr_x += 1;
         }
     }
-
+    pub fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, c: char, fg: Color, bg: Color) {
+        let dx = (x1 - x0).abs();
+        let dy = -(y1 - y0).abs();
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let sy = if y0 < y1 { 1 } else { -1 };
+        let mut err = dx + dy;
+        let mut x = x0;
+        let mut y = y0;
+        loop {
+            if x >= 0 && x < self.width as i32 && y >= 0 && y < self.height as i32 {
+                self.set(x as u16, y as u16, c, fg, bg);
+            }
+            if x == x1 && y == y1 {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                x += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                y += sy;
+            }
+        }
+    }
     pub fn get(&self, x: u16, y: u16) -> Option<&Cell> {
         if x < self.width && y < self.height {
             Some(&self.cells[(y as usize) * (self.width as usize) + (x as usize)])

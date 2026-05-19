@@ -1,20 +1,21 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ModeConfig {
     pub theme_idx: usize,
     pub charset_idx: usize,
 }
-
 #[derive(Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
     pub last_mode: String,
     pub modes: HashMap<String, ModeConfig>,
+    #[serde(default)]
+    pub user_name: Option<String>,
+    #[serde(default)]
+    pub utc_offset_hours: i32,
 }
-
 impl Default for AppConfig {
     fn default() -> Self {
         let mut modes = HashMap::new();
@@ -54,7 +55,6 @@ impl Default for AppConfig {
             ("Boids", 3, 0),
             ("Clocks", 0, 0),
         ];
-
         for (name, theme_idx, charset_idx) in config_data {
             modes.insert(
                 name.to_string(),
@@ -64,14 +64,14 @@ impl Default for AppConfig {
                 },
             );
         }
-
         Self {
             last_mode: "Matrix".to_string(),
             modes,
+            user_name: None,
+            utc_offset_hours: 0,
         }
     }
 }
-
 impl AppConfig {
     pub fn load() -> Self {
         let mut default_config = Self::default();
@@ -83,25 +83,34 @@ impl AppConfig {
                 for (k, v) in config.modes {
                     default_config.modes.insert(k, v);
                 }
+                default_config.user_name = config.user_name;
             }
+        }
+        if default_config.user_name.is_none()
+            || default_config
+                .user_name
+                .as_ref()
+                .map_or(true, |s| s.is_empty())
+        {
+            let env_username = std::env::var("USER")
+                .or_else(|_| std::env::var("USERNAME"))
+                .unwrap_or_else(|_| "User".to_string());
+            default_config.user_name = Some(env_username);
         }
         default_config.save();
         default_config
     }
-
     pub fn save(&self) {
         if let Ok(data) = serde_json::to_string_pretty(self) {
             let _ = fs::write("config.json", data);
         }
     }
-
     pub fn get_mode_config(&self, mode_name: &str) -> ModeConfig {
         self.modes.get(mode_name).cloned().unwrap_or(ModeConfig {
             theme_idx: 0,
             charset_idx: 0,
         })
     }
-
     pub fn set_mode_config(&mut self, mode_name: &str, theme_idx: usize, charset_idx: usize) {
         self.modes.insert(
             mode_name.to_string(),

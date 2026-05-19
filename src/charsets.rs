@@ -3,7 +3,15 @@ pub struct CharSet {
     pub name: &'static str,
     pub chars: Vec<char>,
 }
-
+impl CharSet {
+    pub fn sample(&self, val: f64) -> char {
+        if self.chars.is_empty() {
+            return '█';
+        }
+        let idx = (val * self.chars.len() as f64) as usize;
+        self.chars[idx.clamp(0, self.chars.len() - 1)]
+    }
+}
 pub fn get_all_charsets_utf8() -> Vec<CharSet> {
     vec![
         CharSet {
@@ -62,10 +70,6 @@ pub fn get_all_charsets_utf8() -> Vec<CharSet> {
             chars: " абвгдежзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
                 .chars()
                 .collect(),
-        },
-        CharSet {
-            name: "Emoji",
-            chars: " 💀👻👽👾🤖🎃😈👿👹👺💥🔥✨🌟💫".chars().collect(),
         },
         CharSet {
             name: "Cards",

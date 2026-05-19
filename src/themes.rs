@@ -1,45 +1,45 @@
 use crossterm::style::Color;
-
 #[derive(Clone, PartialEq, Eq)]
 pub struct ThemePalette {
     pub colors: Vec<Color>,
     pub background: Color,
 }
-
 impl ThemePalette {
     pub fn new(background: Color, colors: Vec<Color>) -> Self {
         Self { colors, background }
     }
+    pub fn primary(&self) -> Color {
+        self.colors.get(0).copied().unwrap_or(Color::White)
+    }
+    pub fn secondary(&self) -> Color {
+        self.colors.get(1).copied().unwrap_or(Color::White)
+    }
+    pub fn accent(&self) -> Color {
+        self.colors.get(2).copied().unwrap_or(Color::White)
+    }
 }
-
 #[derive(Clone)]
 pub struct ThemeDef {
     pub name: &'static str,
     pub palette: ThemePalette,
 }
-
 pub fn interpolate_gradient(palette: &ThemePalette, ratio: f32) -> Color {
     let ratio = ratio.clamp(0.0, 1.0);
     if palette.colors.is_empty() {
         return palette.background;
     }
-
     let segments = (palette.colors.len() - 1) as f32;
     if segments <= 0.0 {
         return palette.colors[0];
     }
-
     let scaled = ratio * segments;
     let idx = scaled.floor() as usize;
     let t = scaled - scaled.floor();
-
     if idx >= palette.colors.len() - 1 {
         return *palette.colors.last().unwrap();
     }
-
     let c1 = palette.colors[idx];
     let c2 = palette.colors[idx + 1];
-
     let (r1, g1, b1) = match c1 {
         Color::Rgb { r, g, b } => (r as f32, g as f32, b as f32),
         _ => (255.0, 255.0, 255.0),
@@ -48,14 +48,12 @@ pub fn interpolate_gradient(palette: &ThemePalette, ratio: f32) -> Color {
         Color::Rgb { r, g, b } => (r as f32, g as f32, b as f32),
         _ => (255.0, 255.0, 255.0),
     };
-
     Color::Rgb {
         r: (r1 + (r2 - r1) * t) as u8,
         g: (g1 + (g2 - g1) * t) as u8,
         b: (b1 + (b2 - b1) * t) as u8,
     }
 }
-
 pub fn get_all_themes() -> Vec<ThemeDef> {
     vec![
         ThemeDef {

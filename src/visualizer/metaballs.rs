@@ -34,7 +34,7 @@ impl MetaballsVisualizer {
                 y: rng.gen_range(0.0..height as f64),
                 vx: rng.gen_range(-20.0..20.0),
                 vy: rng.gen_range(-20.0..20.0),
-                radius: rng.gen_range(8.0..18.0),
+                radius: rng.gen_range(0.05..0.12),
             });
         }
 
@@ -55,24 +55,27 @@ impl Visualizer for MetaballsVisualizer {
         let w = self.width as f64;
         let h = self.height as f64;
         let dt = delta_time * self.speed_multiplier;
+        let min_dim = w.min(h * 2.0);
 
         for blob in &mut self.blobs {
             blob.x += blob.vx * dt;
             blob.y += blob.vy * dt;
 
-            if blob.x < blob.radius {
-                blob.x = blob.radius;
+            let actual_radius = blob.radius * min_dim;
+
+            if blob.x < actual_radius {
+                blob.x = actual_radius;
                 blob.vx *= -1.0;
-            } else if blob.x > w - blob.radius {
-                blob.x = w - blob.radius;
+            } else if blob.x > w - actual_radius {
+                blob.x = w - actual_radius;
                 blob.vx *= -1.0;
             }
 
-            if blob.y < blob.radius {
-                blob.y = blob.radius;
+            if blob.y < actual_radius / 2.0 {
+                blob.y = actual_radius / 2.0;
                 blob.vy *= -1.0;
-            } else if blob.y > h - blob.radius {
-                blob.y = h - blob.radius;
+            } else if blob.y > h - actual_radius / 2.0 {
+                blob.y = h - actual_radius / 2.0;
                 blob.vy *= -1.0;
             }
         }
@@ -90,6 +93,7 @@ impl Visualizer for MetaballsVisualizer {
         }
 
         let threshold = 1.0;
+        let min_dim = (self.width as f64).min(self.height as f64 * 2.0);
 
         for y in 0..self.height {
             for x in 0..self.width {
@@ -104,7 +108,7 @@ impl Visualizer for MetaballsVisualizer {
                 for blob in &self.blobs {
                     let bx = cx + (blob.x - cx) * self.zoom;
                     let by = cy + (blob.y * 2.0 - cy) * self.zoom;
-                    let r = blob.radius * self.zoom;
+                    let r = blob.radius * min_dim * self.zoom;
 
                     let dist_sq = (px - bx).powi(2) + (py - by).powi(2);
                     if dist_sq > 0.01 {

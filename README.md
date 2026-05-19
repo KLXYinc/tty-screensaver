@@ -2,7 +2,9 @@
 
 A high-performance, aesthetically pleasing terminal screensaver and visualizer engine written in Rust. Experience stunning generative art, 3D projections, and classic particle simulations directly in your terminal.
 
-![TTY Screensaver Preview](./assets/preview.gif) *(Add your preview GIF here!)*
+<div align="center">
+  <img src="./assets/preview_1.gif" alt="TTY Screensaver Preview" />
+</div>
 
 ## 🌟 Features
 
@@ -14,11 +16,10 @@ A high-performance, aesthetically pleasing terminal screensaver and visualizer e
 
 ## 📸 Gallery
 
-*(Replace these placeholders with actual screenshots!)*
-
-| Matrix Mode | City3D Mode | Cyberpunk Theme |
-|:---:|:---:|:---:|
-| `![Matrix](./assets/matrix.png)` | `![City3D](./assets/city3d.png)` | `![Cyberpunk](./assets/cyberpunk.png)` |
+<div align="center">
+  <img src="./assets/preview_1.gif" alt="Preview 1" width="48%" />
+  <img src="./assets/preview_2.gif" alt="Preview 2" width="48%" />
+</div>
 
 ## 🚀 Installation
 

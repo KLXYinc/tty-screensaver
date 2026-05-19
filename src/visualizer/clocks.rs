@@ -343,7 +343,7 @@ impl Visualizer for ClocksVisualizer {
                                 let local_y = dy as f64 - 2.5;
 
                                 let wave_offset = if is_wavy {
-                                    ((local_x * 0.2 + self.time * 5.0).sin() * 2.0)
+                                    (local_x * 0.2 + self.time * 5.0).sin() * 2.0
                                 } else {
                                     0.0
                                 };

@@ -66,7 +66,7 @@ impl Default for AppConfig {
         }
 
         Self {
-            last_mode: "Minecraft".to_string(),
+            last_mode: "Matrix".to_string(),
             modes,
         }
     }
